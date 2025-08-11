@@ -2,10 +2,11 @@ use axum::{
     routing::{get, post},
     Router,
 };
+use sqlx::{Pool, Postgres};
 
 use crate::handlers::users::{login, logout, my_profile, register, update_user};
 
-pub fn user_routes() -> Router {
+pub fn user_routes() -> Router<Pool<Postgres>> {
     Router::new()
         .route("/users/register", post(register))
         .route("/users/login", post(login))
