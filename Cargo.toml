@@ -4,5 +4,9 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-axum = "0.8.4"
+axum = { version = "0.8.4", features = ["macros"] }
+serde = { version = "1.0.219", features = ["derive", "serde_derive"] }
+sqlx = { version = "0.8.6", features = ["postgres", "runtime-tokio", "tls-rustls"] }
+sqlx-cli = { version = "0.8.6", features = ["rustls"] }
 tokio = { version = "1.47.1", features = ["rt-multi-thread", "macros"] }
+
