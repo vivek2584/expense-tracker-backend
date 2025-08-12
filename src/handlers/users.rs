@@ -3,14 +3,15 @@ use axum::{extract::State, http::StatusCode};
 use serde::{Deserialize, Serialize};
 use sqlx::query;
 use sqlx::{prelude::FromRow, query_as, PgPool};
+use uuid::Uuid;
 
 use crate::errors::GlobalAppError;
-use crate::helpers::users::hash_password;
+use crate::helpers::users::{create_jwt, hash_password, verify_password};
 
 pub async fn register(
     State(pool): State<PgPool>,
     Json(register_data): Json<RegisterUserDetails>,
-) -> Result<Json<UserDetails>, GlobalAppError> {
+) -> Result<Json<RegisterResponseUserDetails>, GlobalAppError> {
     let rows =
         query_as::<_, UserDetailRow>("SELECT name, email FROM users WHERE name = $1 OR email = $2")
             .bind(register_data.user_name.as_str())
@@ -45,15 +46,49 @@ pub async fn register(
                 )
             })?;
 
-        Ok(Json(UserDetails {
+        Ok(Json(RegisterResponseUserDetails {
             user_name: register_data.user_name,
             email: register_data.email,
             log_message: "User successfully registered".to_string(),
+            token: None,
         }))
     }
 }
 
-pub async fn login() {}
+pub async fn login(
+    State(pool): State<PgPool>,
+    Json(login_data): Json<LoginUserDetails>,
+) -> Result<Json<LoginResponseUserDetails>, GlobalAppError> {
+    let row =
+        query_as::<_, UserPasswordRow>("SELECT id, name, password_hash FROM users WHERE name = $1")
+            .bind(login_data.user_name.as_str())
+            .fetch_one(&pool)
+            .await
+            .map_err(|error| match error {
+                sqlx::Error::RowNotFound => GlobalAppError::new(
+                    StatusCode::BAD_REQUEST,
+                    "user not found!, please register and try again".to_string(),
+                ),
+                _ => {
+                    eprintln!("--> DATABASE ERROR: {:?}", error);
+                    GlobalAppError::new(
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        "database error!".to_string(),
+                    )
+                }
+            })?;
+
+    let hashed_password = row.password_hash;
+    verify_password(login_data.password, hashed_password).await?;
+
+    let jwt_token = create_jwt(row.id.to_string())?;
+
+    Ok(Json(LoginResponseUserDetails {
+        user_name: login_data.user_name,
+        log_message: "successfully logged in!, jwt token expires in 1 hour".to_string(),
+        token: Some(jwt_token),
+    }))
+}
 
 pub async fn logout() {}
 
@@ -68,15 +103,36 @@ pub struct RegisterUserDetails {
     password: String,
 }
 
+#[derive(Deserialize)]
+pub struct LoginUserDetails {
+    user_name: String,
+    password: String,
+}
+
 #[derive(Serialize)]
-pub struct UserDetails {
+pub struct RegisterResponseUserDetails {
     user_name: String,
     email: String,
     log_message: String,
+    token: Option<String>,
+}
+
+#[derive(Serialize)]
+pub struct LoginResponseUserDetails {
+    user_name: String,
+    log_message: String,
+    token: Option<String>,
 }
 
 #[derive(FromRow)]
 struct UserDetailRow {
     name: String,
     email: String,
+}
+
+#[derive(FromRow)]
+struct UserPasswordRow {
+    id: Uuid,
+    name: String,
+    password_hash: String,
 }
