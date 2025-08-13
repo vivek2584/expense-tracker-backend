@@ -1,5 +1,6 @@
-use axum::Json;
 use axum::{extract::State, http::StatusCode};
+use axum::{Extension, Json};
+use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use sqlx::query;
 use sqlx::{prelude::FromRow, query_as};
@@ -91,7 +92,25 @@ pub async fn login(
     }))
 }
 
-pub async fn my_profile() {}
+pub async fn my_profile(
+    State(state): State<GlobalAppState>,
+    Extension(uuid): Extension<Uuid>,
+) -> Result<Json<UserProfileDetails>, GlobalAppError> {
+    Ok(Json(
+        query_as::<_, UserProfileDetails>(
+            "SELECT id, name, email, created_at, updated_at, is_active FROM users WHERE id = $1",
+        )
+        .bind(uuid)
+        .fetch_one(&state.pool)
+        .await
+        .map_err(|_| {
+            GlobalAppError::new(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "database error!".to_string(),
+            )
+        })?,
+    ))
+}
 
 pub async fn update_user() {}
 
@@ -134,4 +153,14 @@ struct UserPasswordRow {
     id: Uuid,
     name: String,
     password_hash: String,
+}
+
+#[derive(FromRow, Serialize)]
+pub struct UserProfileDetails {
+    id: Uuid,
+    name: String,
+    created_at: chrono::DateTime<Utc>,
+    updated_at: chrono::DateTime<Utc>,
+    email: String,
+    is_active: bool,
 }

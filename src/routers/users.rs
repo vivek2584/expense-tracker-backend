@@ -5,12 +5,13 @@ use axum::{
 
 use crate::{
     handlers::users::{login, my_profile, register, update_user},
-    middlewares::GlobalAppState,
+    middlewares::{auth::validate_jwt, GlobalAppState},
 };
 
-pub fn user_routes() -> Router<GlobalAppState> {
+pub fn user_routes(state: GlobalAppState) -> Router<GlobalAppState> {
     Router::new()
+        .route("/users/me", get(my_profile).patch(update_user))
+        .layer(axum::middleware::from_fn_with_state(state, validate_jwt))
         .route("/users/register", post(register))
         .route("/users/login", post(login))
-        .route("/users/me", get(my_profile).patch(update_user))
 }

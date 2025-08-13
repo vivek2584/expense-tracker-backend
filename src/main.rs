@@ -1,5 +1,5 @@
 use expense_tracker_backend::{middlewares::GlobalAppState, routers};
-use sqlx::{postgres::PgPoolOptions, PgPool};
+use sqlx::postgres::PgPoolOptions;
 
 #[tokio::main]
 async fn main() {
