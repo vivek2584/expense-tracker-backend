@@ -2,21 +2,22 @@ use axum::Json;
 use axum::{extract::State, http::StatusCode};
 use serde::{Deserialize, Serialize};
 use sqlx::query;
-use sqlx::{prelude::FromRow, query_as, PgPool};
+use sqlx::{prelude::FromRow, query_as};
 use uuid::Uuid;
 
 use crate::errors::GlobalAppError;
 use crate::helpers::users::{create_jwt, hash_password, verify_password};
+use crate::middlewares::GlobalAppState;
 
 pub async fn register(
-    State(pool): State<PgPool>,
+    State(state): State<GlobalAppState>,
     Json(register_data): Json<RegisterUserDetails>,
 ) -> Result<Json<RegisterResponseUserDetails>, GlobalAppError> {
     let rows =
         query_as::<_, UserDetailRow>("SELECT name, email FROM users WHERE name = $1 OR email = $2")
             .bind(register_data.user_name.as_str())
             .bind(register_data.email.as_str())
-            .fetch_all(&pool)
+            .fetch_all(&state.pool)
             .await
             .map_err(|_| {
                 GlobalAppError::new(
@@ -37,7 +38,7 @@ pub async fn register(
             .bind(register_data.email.as_str())
             .bind(password_hash)
             .bind(true)
-            .execute(&pool)
+            .execute(&state.pool)
             .await
             .map_err(|_| {
                 GlobalAppError::new(
@@ -56,13 +57,13 @@ pub async fn register(
 }
 
 pub async fn login(
-    State(pool): State<PgPool>,
+    State(state): State<GlobalAppState>,
     Json(login_data): Json<LoginUserDetails>,
 ) -> Result<Json<LoginResponseUserDetails>, GlobalAppError> {
     let row =
         query_as::<_, UserPasswordRow>("SELECT id, name, password_hash FROM users WHERE name = $1")
             .bind(login_data.user_name.as_str())
-            .fetch_one(&pool)
+            .fetch_one(&state.pool)
             .await
             .map_err(|error| match error {
                 sqlx::Error::RowNotFound => GlobalAppError::new(
@@ -81,7 +82,7 @@ pub async fn login(
     let hashed_password = row.password_hash;
     verify_password(login_data.password, hashed_password).await?;
 
-    let jwt_token = create_jwt(row.id.to_string())?;
+    let jwt_token = create_jwt(row.id.to_string(), state.hmac)?;
 
     Ok(Json(LoginResponseUserDetails {
         user_name: login_data.user_name,
@@ -89,8 +90,6 @@ pub async fn login(
         token: Some(jwt_token),
     }))
 }
-
-pub async fn logout() {}
 
 pub async fn my_profile() {}
 

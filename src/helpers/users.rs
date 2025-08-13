@@ -5,7 +5,7 @@ use argon2::{
 use axum::http::StatusCode;
 use chrono::{Duration, Utc};
 use jsonwebtoken::{encode, EncodingKey, Header};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use crate::errors::GlobalAppError;
 
@@ -53,14 +53,14 @@ pub async fn verify_password(
     .unwrap()
 }
 
-#[derive(Serialize)]
-struct Claims {
-    sub: String,
-    iat: i64,
-    exp: i64,
+#[derive(Serialize, Deserialize)]
+pub struct Claims {
+    pub sub: String,
+    pub iat: i64,
+    pub exp: i64,
 }
 
-pub fn create_jwt(uuid: String) -> Result<String, GlobalAppError> {
+pub fn create_jwt(uuid: String, hmac_key: String) -> Result<String, GlobalAppError> {
     let header = Header::new(jsonwebtoken::Algorithm::HS384);
 
     let now = Utc::now();
@@ -70,13 +70,6 @@ pub fn create_jwt(uuid: String) -> Result<String, GlobalAppError> {
         exp: (now + Duration::hours(1)).timestamp(),
     };
 
-    dotenvy::dotenv().unwrap();
-    let hmac_key = dotenvy::var("HMAC_KEY").map_err(|_| {
-        GlobalAppError::new(
-            StatusCode::INTERNAL_SERVER_ERROR,
-            "unable to read HMAC KEY from .env!".to_string(),
-        )
-    })?;
     let key = EncodingKey::from_base64_secret(hmac_key.as_str()).map_err(|_| {
         GlobalAppError::new(
             StatusCode::INTERNAL_SERVER_ERROR,
