@@ -11,7 +11,7 @@ use crate::{
 pub fn user_routes(state: GlobalAppState) -> Router<GlobalAppState> {
     Router::new()
         .route("/users/me", get(my_profile).patch(update_user))
-        .layer(axum::middleware::from_fn_with_state(state, validate_jwt))
+        .route_layer(axum::middleware::from_fn_with_state(state, validate_jwt))
         .route("/users/register", post(register))
         .route("/users/login", post(login))
 }
