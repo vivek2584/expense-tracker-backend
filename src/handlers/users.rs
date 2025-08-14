@@ -13,7 +13,7 @@ use crate::middlewares::GlobalAppState;
 pub async fn register(
     State(state): State<GlobalAppState>,
     Json(register_data): Json<RegisterUserDetails>,
-) -> Result<Json<RegisterResponseUserDetails>, GlobalAppError> {
+) -> Result<Json<ResponseUserDetails>, GlobalAppError> {
     let rows =
         query_as::<_, UserDetailRow>("SELECT name, email FROM users WHERE name = $1 OR email = $2")
             .bind(register_data.user_name.as_str())
@@ -48,7 +48,7 @@ pub async fn register(
                 )
             })?;
 
-        Ok(Json(RegisterResponseUserDetails {
+        Ok(Json(ResponseUserDetails {
             user_name: register_data.user_name,
             email: register_data.email,
             log_message: "User successfully registered".to_string(),
@@ -112,7 +112,40 @@ pub async fn my_profile(
     ))
 }
 
-pub async fn update_user() {}
+pub async fn update_password(
+    State(state): State<GlobalAppState>,
+    Extension(uuid): Extension<Uuid>,
+    Json(patch_password): Json<PasswordPatch>,
+) -> Result<String, GlobalAppError> {
+    let row =
+        query_as::<_, UserPasswordRow>("SELECT id, name, password_hash FROM users WHERE id = $1")
+            .bind(uuid)
+            .fetch_one(&state.pool)
+            .await
+            .map_err(|_| {
+                GlobalAppError::new(
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "database error!".to_string(),
+                )
+            })?;
+
+    verify_password(patch_password.old_password, row.password_hash).await?;
+
+    let new_password_hash = hash_password(patch_password.new_password).await?;
+    query("UPDATE users SET password_hash = $1 WHERE id = $2")
+        .bind(new_password_hash)
+        .bind(uuid)
+        .execute(&state.pool)
+        .await
+        .map_err(|_| {
+            GlobalAppError::new(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "database error!".to_string(),
+            )
+        })?;
+
+    Ok("Password Update Successfully!".to_string())
+}
 
 #[derive(Deserialize)]
 pub struct RegisterUserDetails {
@@ -128,7 +161,7 @@ pub struct LoginUserDetails {
 }
 
 #[derive(Serialize)]
-pub struct RegisterResponseUserDetails {
+pub struct ResponseUserDetails {
     user_name: String,
     email: String,
     log_message: String,
@@ -163,4 +196,10 @@ pub struct UserProfileDetails {
     updated_at: chrono::DateTime<Utc>,
     email: String,
     is_active: bool,
+}
+
+#[derive(Deserialize)]
+pub struct PasswordPatch {
+    old_password: String,
+    new_password: String,
 }
