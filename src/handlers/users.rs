@@ -71,13 +71,10 @@ pub async fn login(
                     StatusCode::BAD_REQUEST,
                     "user not found!, please register and try again".to_string(),
                 ),
-                _ => {
-                    eprintln!("--> DATABASE ERROR: {:?}", error);
-                    GlobalAppError::new(
-                        StatusCode::INTERNAL_SERVER_ERROR,
-                        "database error!".to_string(),
-                    )
-                }
+                _ => GlobalAppError::new(
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "database error!".to_string(),
+                ),
             })?;
 
     let hashed_password = row.password_hash;
@@ -144,7 +141,45 @@ pub async fn update_password(
             )
         })?;
 
-    Ok("Password Update Successfully!".to_string())
+    Ok("Password updated successfully!".to_string())
+}
+
+pub async fn delete_user(
+    State(state): State<GlobalAppState>,
+    Extension(uuid): Extension<Uuid>,
+    Json(user_password): Json<Password>,
+) -> Result<String, GlobalAppError> {
+    let password_hash =
+        query_as::<_, HashPassword>("SELECT password_hash FROM users WHERE id = $1")
+            .bind(uuid)
+            .fetch_one(&state.pool)
+            .await
+            .map_err(|error| match error {
+                sqlx::Error::RowNotFound => GlobalAppError::new(
+                    StatusCode::BAD_REQUEST,
+                    "User deleted, register again!".to_string(),
+                ),
+                _ => GlobalAppError::new(
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "User deleted, register again!".to_string(),
+                ),
+            })?
+            .password_hash;
+
+    verify_password(user_password.password, password_hash).await?;
+
+    query("DELETE FROM users WHERE id = $1")
+        .bind(uuid)
+        .execute(&state.pool)
+        .await
+        .map_err(|_| {
+            GlobalAppError::new(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "database error!".to_string(),
+            )
+        })?;
+
+    Ok("User deleted successfully!".to_string())
 }
 
 #[derive(Deserialize)]
@@ -202,4 +237,14 @@ pub struct UserProfileDetails {
 pub struct PasswordPatch {
     old_password: String,
     new_password: String,
+}
+
+#[derive(Deserialize)]
+pub struct Password {
+    password: String,
+}
+
+#[derive(FromRow)]
+pub struct HashPassword {
+    password_hash: String,
 }
