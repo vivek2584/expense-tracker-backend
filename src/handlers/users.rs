@@ -1,14 +1,16 @@
 use axum::{extract::State, http::StatusCode};
 use axum::{Extension, Json};
 use chrono::Utc;
-use serde::{Deserialize, Serialize};
-use sqlx::query;
-use sqlx::{prelude::FromRow, query_as};
+use sqlx::{query, query_as};
 use uuid::Uuid;
 
 use crate::errors::GlobalAppError;
 use crate::helpers::users::{create_jwt, hash_password, verify_password};
 use crate::middlewares::GlobalAppState;
+use crate::models::users::{
+    HashPassword, LoginResponseUserDetails, LoginUserDetails, Password, PasswordPatch,
+    RegisterUserDetails, ResponseUserDetails, UserDetailRow, UserPasswordRow, UserProfileDetails,
+};
 
 pub async fn register(
     State(state): State<GlobalAppState>,
@@ -129,8 +131,9 @@ pub async fn update_password(
     verify_password(patch_password.old_password, row.password_hash).await?;
 
     let new_password_hash = hash_password(patch_password.new_password).await?;
-    query("UPDATE users SET password_hash = $1 WHERE id = $2")
+    query("UPDATE users SET password_hash = $1, updated_at = $2 WHERE id = $3")
         .bind(new_password_hash)
+        .bind(Utc::now())
         .bind(uuid)
         .execute(&state.pool)
         .await
@@ -161,7 +164,7 @@ pub async fn delete_user(
                 ),
                 _ => GlobalAppError::new(
                     StatusCode::INTERNAL_SERVER_ERROR,
-                    "User deleted, register again!".to_string(),
+                    "database error!".to_string(),
                 ),
             })?
             .password_hash;
@@ -180,71 +183,4 @@ pub async fn delete_user(
         })?;
 
     Ok("User deleted successfully!".to_string())
-}
-
-#[derive(Deserialize)]
-pub struct RegisterUserDetails {
-    user_name: String,
-    email: String,
-    password: String,
-}
-
-#[derive(Deserialize)]
-pub struct LoginUserDetails {
-    user_name: String,
-    password: String,
-}
-
-#[derive(Serialize)]
-pub struct ResponseUserDetails {
-    user_name: String,
-    email: String,
-    log_message: String,
-    token: Option<String>,
-}
-
-#[derive(Serialize)]
-pub struct LoginResponseUserDetails {
-    user_name: String,
-    log_message: String,
-    token: Option<String>,
-}
-
-#[derive(FromRow)]
-struct UserDetailRow {
-    name: String,
-    email: String,
-}
-
-#[derive(FromRow)]
-struct UserPasswordRow {
-    id: Uuid,
-    name: String,
-    password_hash: String,
-}
-
-#[derive(FromRow, Serialize)]
-pub struct UserProfileDetails {
-    id: Uuid,
-    name: String,
-    created_at: chrono::DateTime<Utc>,
-    updated_at: chrono::DateTime<Utc>,
-    email: String,
-    is_active: bool,
-}
-
-#[derive(Deserialize)]
-pub struct PasswordPatch {
-    old_password: String,
-    new_password: String,
-}
-
-#[derive(Deserialize)]
-pub struct Password {
-    password: String,
-}
-
-#[derive(FromRow)]
-pub struct HashPassword {
-    password_hash: String,
 }
