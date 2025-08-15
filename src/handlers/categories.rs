@@ -1,4 +1,8 @@
-use axum::{extract::State, http::StatusCode, Extension, Json};
+use axum::{
+    extract::{Path, State},
+    http::StatusCode,
+    Extension, Json,
+};
 use slug::slugify;
 use sqlx::{query, query_as};
 use uuid::Uuid;
@@ -70,4 +74,31 @@ pub async fn list_categories(
             )
         })?,
     ))
+}
+
+pub async fn delete_category(
+    State(state): State<GlobalAppState>,
+    Extension(uuid): Extension<Uuid>,
+    Path(cat_id): Path<Uuid>,
+) -> Result<String, GlobalAppError> {
+    let result = query("DELETE from categories WHERE id = $1 AND user_id = $2")
+        .bind(cat_id)
+        .bind(uuid)
+        .execute(&state.pool)
+        .await
+        .map_err(|_| {
+            GlobalAppError::new(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "database error!".to_string(),
+            )
+        })?;
+
+    if result.rows_affected() == 0 {
+        return Err(GlobalAppError::new(
+            StatusCode::NOT_FOUND,
+            "category was not found!".to_string(),
+        ));
+    }
+
+    Ok("Category deleted successfully!".to_string())
 }
