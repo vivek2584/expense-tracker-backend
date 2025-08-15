@@ -1,11 +1,11 @@
 use axum::{
-    routing::{get, post},
     Router,
+    routing::{get, post},
 };
 
 use crate::{
     handlers::users::{delete_user, login, my_profile, register, update_password},
-    middlewares::{auth::validate_jwt, GlobalAppState},
+    middlewares::{GlobalAppState, auth::validate_jwt},
 };
 
 pub fn user_routes(state: GlobalAppState) -> Router<GlobalAppState> {

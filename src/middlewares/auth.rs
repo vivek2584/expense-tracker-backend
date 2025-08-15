@@ -4,7 +4,7 @@ use axum::{
     middleware::Next,
     response::Response,
 };
-use axum_extra::headers::{authorization::Bearer, Authorization, HeaderMapExt};
+use axum_extra::headers::{Authorization, HeaderMapExt, authorization::Bearer};
 use jsonwebtoken::{Algorithm, DecodingKey, Validation};
 use uuid::Uuid;
 

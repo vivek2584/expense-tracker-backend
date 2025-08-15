@@ -102,3 +102,30 @@ pub async fn delete_category(
 
     Ok("Category deleted successfully!".to_string())
 }
+
+pub async fn display_category(
+    State(state): State<GlobalAppState>,
+    Path(cat_id): Path<Uuid>,
+    Extension(uuid): Extension<Uuid>,
+) -> Result<Json<GetUserCategories>, GlobalAppError> {
+    if let Some(category) = query_as::<_, GetUserCategories>(
+        "SELECT id, name, created_at, type, is_savings FROM categories WHERE id = $1 AND user_id = $2",
+    )
+    .bind(cat_id)
+    .bind(uuid)
+    .fetch_optional(&state.pool)
+    .await
+    .map_err(|_| {
+        GlobalAppError::new(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "database error!".to_string(),
+        )
+    })? {
+        Ok(Json(category))
+    } else {
+        Err(GlobalAppError::new(
+            StatusCode::NOT_FOUND,
+            "category not found!".to_string(),
+        ))
+    }
+}

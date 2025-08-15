@@ -19,7 +19,7 @@ pub enum CategoryType {
     Income,
 }
 
-#[derive(FromRow, Serialize)]
+#[derive(FromRow, Deserialize, Serialize)]
 pub struct GetUserCategories {
     pub id: Uuid,
     pub name: String,
@@ -27,4 +27,11 @@ pub struct GetUserCategories {
     #[sqlx(rename = "type")]
     pub category_type: CategoryType,
     pub is_savings: bool,
+}
+
+#[derive(Deserialize)]
+pub struct PatchUserCategories {
+    pub name: Option<String>,
+    pub category_type: Option<CategoryType>,
+    pub is_savings: Option<bool>,
 }

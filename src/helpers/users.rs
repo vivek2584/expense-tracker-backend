@@ -1,10 +1,10 @@
 use argon2::{
-    password_hash::{rand_core::OsRng, SaltString},
     Argon2, PasswordHash,
+    password_hash::{SaltString, rand_core::OsRng},
 };
 use axum::http::StatusCode;
 use chrono::{Duration, Utc};
-use jsonwebtoken::{encode, EncodingKey, Header};
+use jsonwebtoken::{EncodingKey, Header, encode};
 use serde::{Deserialize, Serialize};
 
 use crate::errors::GlobalAppError;
