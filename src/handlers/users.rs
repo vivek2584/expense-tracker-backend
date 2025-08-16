@@ -1,5 +1,5 @@
-use axum::{Extension, Json};
 use axum::{extract::State, http::StatusCode};
+use axum::{Extension, Json};
 use chrono::Utc;
 use sqlx::{query, query_as};
 use uuid::Uuid;
@@ -18,7 +18,7 @@ pub async fn register(
 ) -> Result<Json<ResponseUserDetails>, GlobalAppError> {
     let rows =
         query_as::<_, UserDetailRow>("SELECT name, email FROM users WHERE name = $1 OR email = $2")
-            .bind(register_data.user_name.as_str())
+            .bind(register_data.username.as_str())
             .bind(register_data.email.as_str())
             .fetch_all(&state.pool)
             .await
@@ -37,7 +37,7 @@ pub async fn register(
     } else {
         let password_hash = hash_password(register_data.password).await?;
         query("INSERT INTO users (name, email, password_hash, is_active) VALUES ($1, $2, $3, $4)")
-            .bind(register_data.user_name.as_str())
+            .bind(register_data.username.as_str())
             .bind(register_data.email.as_str())
             .bind(password_hash)
             .bind(true)
@@ -51,7 +51,7 @@ pub async fn register(
             })?;
 
         Ok(Json(ResponseUserDetails {
-            user_name: register_data.user_name,
+            username: register_data.username,
             email: register_data.email,
             log_message: "User successfully registered".to_string(),
             token: None,
@@ -65,7 +65,7 @@ pub async fn login(
 ) -> Result<Json<LoginResponseUserDetails>, GlobalAppError> {
     let row =
         query_as::<_, UserPasswordRow>("SELECT id, name, password_hash FROM users WHERE name = $1")
-            .bind(login_data.user_name.as_str())
+            .bind(login_data.username.as_str())
             .fetch_one(&state.pool)
             .await
             .map_err(|error| match error {
@@ -85,7 +85,7 @@ pub async fn login(
     let jwt_token = create_jwt(row.id.to_string(), state.hmac)?;
 
     Ok(Json(LoginResponseUserDetails {
-        user_name: login_data.user_name,
+        username: login_data.username,
         log_message: "successfully logged in!, jwt token expires in 1 hour".to_string(),
         token: Some(jwt_token),
     }))

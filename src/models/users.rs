@@ -5,20 +5,20 @@ use uuid::Uuid;
 
 #[derive(Deserialize)]
 pub struct RegisterUserDetails {
-    pub user_name: String,
+    pub username: String,
     pub email: String,
     pub password: String,
 }
 
 #[derive(Deserialize)]
 pub struct LoginUserDetails {
-    pub user_name: String,
+    pub username: String,
     pub password: String,
 }
 
 #[derive(Serialize)]
 pub struct ResponseUserDetails {
-    pub user_name: String,
+    pub username: String,
     pub email: String,
     pub log_message: String,
     pub token: Option<String>,
@@ -26,7 +26,7 @@ pub struct ResponseUserDetails {
 
 #[derive(Serialize)]
 pub struct LoginResponseUserDetails {
-    pub user_name: String,
+    pub username: String,
     pub log_message: String,
     pub token: Option<String>,
 }
