@@ -37,8 +37,7 @@ pub async fn create_category(
             .bind(category.is_savings)
             .execute(&mut *tx)
             .await
-            .map_err(|error| {
-                eprintln!("{:#?}", error);
+            .map_err(|_| {
                 GlobalAppError::new(
                     StatusCode::INTERNAL_SERVER_ERROR,
                     "database error!".to_string(),

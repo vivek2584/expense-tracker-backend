@@ -6,10 +6,10 @@ use uuid::Uuid;
 use crate::{
     errors::GlobalAppError,
     middlewares::GlobalAppState,
-    models::transactions::{GetCategoryId, TransactionRequest},
+    models::transactions::{GetCategoryId, TransactionInfo, TransactionRequest},
 };
 
-pub async fn add_expense(
+pub async fn add_transactions(
     state: State<GlobalAppState>,
     Extension(uuid): Extension<Uuid>,
     Json(transactions): Json<Vec<TransactionRequest>>,
@@ -41,7 +41,7 @@ pub async fn add_expense(
             ),
         })?;
 
-        query("INSERT INTO expenses (user_id, category_id, description, amount, transaction_date) VALUES ($1, $2, $3, $4, $5)")
+        query("INSERT INTO transactions (user_id, category_id, description, amount, transaction_date) VALUES ($1, $2, $3, $4, $5)")
             .bind(uuid)
             .bind(cat_id.id)
             .bind(transaction.description)
@@ -65,4 +65,38 @@ pub async fn add_expense(
     })?;
 
     Ok("Expenses updated successfully!".to_string())
+}
+
+pub async fn list_transactions(
+    state: State<GlobalAppState>,
+    Extension(uuid): Extension<Uuid>,
+) -> Result<Json<Vec<TransactionInfo>>, GlobalAppError> {
+    Ok(Json(
+        query_as::<_, TransactionInfo>(
+            r#"SELECT 
+        t.id, 
+        t.amount, 
+        t.description, 
+        t.transaction_date, 
+        c.id, 
+        c.name, 
+        c.type, 
+        c.is_savings, 
+        c.created_at
+        FROM transactions t 
+        INNER JOIN categories c 
+        ON t.category_id = c.id 
+        WHERE t.user_id = $1"#,
+        )
+        .bind(uuid)
+        .fetch_all(&state.pool)
+        .await
+        .map_err(|error| {
+            eprintln!("{}", error.to_string());
+            GlobalAppError::new(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "database error!".to_string(),
+            )
+        })?,
+    ))
 }
